@@ -61,6 +61,12 @@ return [
             'reply_to_address' => 'Recipient Email',
             'reply_to_name' => 'Recipient Name',
             'locale' => 'Language',
+            'utm_source' => 'UTM Source',
+            'utm_source_placeholder' => 'e.g. newsletter',
+            'utm_medium' => 'UTM Medium',
+            'utm_medium_placeholder' => 'e.g. email',
+            'utm_campaign' => 'UTM Campaign',
+            'utm_campaign_placeholder' => 'e.g. summer_sale',
         ],
 
         'sections' => [
@@ -68,6 +74,8 @@ return [
             'custom_sender_description' => 'Override the default from address for this template',
             'custom_reply_to' => 'Custom Reply To',
             'custom_reply_to_description' => 'Set reply to address for this template',
+            'utm_defaults' => 'UTM Tracking Defaults',
+            'utm_defaults_description' => 'Campaign-level parameters applied to links that opt in to UTM tracking.',
         ],
 
         'tokens' => [
@@ -92,6 +100,12 @@ return [
             'align_center' => 'Center',
             'align_right' => 'Right',
             'button_default_label' => 'Click here',
+            'use_utm' => 'Add UTM tracking',
+            'use_utm_helper' => 'Append campaign tracking parameters to this link.',
+            'utm_content' => 'UTM Content',
+            'utm_content_helper' => 'Distinguishes this specific link (utm_content).',
+            'utm_term' => 'UTM Term',
+            'utm_term_helper' => 'Optional keyword for this link (utm_term).',
         ],
 
         'columns' => [

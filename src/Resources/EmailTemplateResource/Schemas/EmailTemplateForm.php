@@ -170,6 +170,29 @@ class EmailTemplateForm
                                     ]),
                                 ])
                                 ->collapsed(),
+
+                            Section::make(__('fin-mail::fin-mail.template.sections.utm_defaults'))
+                                ->description(__('fin-mail::fin-mail.template.sections.utm_defaults_description'))
+                                ->visible(fn (): bool => (bool) config('fin-mail.utm.enabled', true))
+                                ->schema([
+                                    Grid::make(3)->schema([
+                                        TextInput::make('utm_source')
+                                            ->label(__('fin-mail::fin-mail.template.fields.utm_source'))
+                                            ->placeholder(__('fin-mail::fin-mail.template.fields.utm_source_placeholder'))
+                                            ->maxLength(255),
+
+                                        TextInput::make('utm_medium')
+                                            ->label(__('fin-mail::fin-mail.template.fields.utm_medium'))
+                                            ->placeholder(__('fin-mail::fin-mail.template.fields.utm_medium_placeholder'))
+                                            ->maxLength(255),
+
+                                        TextInput::make('utm_campaign')
+                                            ->label(__('fin-mail::fin-mail.template.fields.utm_campaign'))
+                                            ->placeholder(__('fin-mail::fin-mail.template.fields.utm_campaign_placeholder'))
+                                            ->maxLength(255),
+                                    ]),
+                                ])
+                                ->collapsed(),
                         ]),
 
                     Tab::make(__('fin-mail::fin-mail.template.tabs.tokens'))

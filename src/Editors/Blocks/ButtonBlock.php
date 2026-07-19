@@ -8,6 +8,9 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\RichEditor\RichContentCustomBlock;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
+use FinityLabs\FinMail\Helpers\UtmComposer;
 use FinityLabs\FinMail\Models\EmailTheme;
 
 class ButtonBlock extends RichContentCustomBlock
@@ -55,6 +58,26 @@ class ButtonBlock extends RichContentCustomBlock
                     ])
                     ->default('center')
                     ->native(false),
+
+                ...(UtmComposer::enabled() ? [
+                    Toggle::make('use_utm')
+                        ->label(__('fin-mail::fin-mail.template.blocks.use_utm'))
+                        ->helperText(__('fin-mail::fin-mail.template.blocks.use_utm_helper'))
+                        ->default(false)
+                        ->live(),
+
+                    TextInput::make('utm_content')
+                        ->label(__('fin-mail::fin-mail.template.blocks.utm_content'))
+                        ->helperText(__('fin-mail::fin-mail.template.blocks.utm_content_helper'))
+                        ->maxLength(255)
+                        ->visible(fn (Get $get): bool => (bool) $get('use_utm')),
+
+                    TextInput::make('utm_term')
+                        ->label(__('fin-mail::fin-mail.template.blocks.utm_term'))
+                        ->helperText(__('fin-mail::fin-mail.template.blocks.utm_term_helper'))
+                        ->maxLength(255)
+                        ->visible(fn (Get $get): bool => (bool) $get('use_utm')),
+                ] : []),
             ]);
     }
 
@@ -84,7 +107,10 @@ class ButtonBlock extends RichContentCustomBlock
     public static function toHtml(array $config, array $data): ?string
     {
         $label = e($config['label'] ?? __('fin-mail::fin-mail.template.blocks.button_default_label'));
-        $url = e($config['url'] ?? '#');
+
+        /** @var array<string, string> $utmDefaults */
+        $utmDefaults = $data['utm_defaults'] ?? [];
+        $url = e(UtmComposer::composeButtonUrl($config['url'] ?? '#', $config, $utmDefaults));
         $align = $config['align'] ?? 'center';
 
         $theme = $data['theme'] ?? EmailTheme::getDefault()?->resolvedColors() ?? EmailTheme::defaultColors();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FinityLabs\FinMail\Mail;
 
 use FinityLabs\FinMail\Helpers\TokenReplacer;
+use FinityLabs\FinMail\Helpers\UtmComposer;
 use FinityLabs\FinMail\Models\EmailTemplate;
 use FinityLabs\FinMail\Models\SentEmail;
 use FinityLabs\FinMail\Settings\BrandingSettings;
@@ -202,12 +203,18 @@ class TemplateMail extends Mailable implements ShouldQueue
             with: array_merge(
                 [
                     'body' => $this->overrideBody
-                        ? app(TokenReplacer::class)->replace(
-                            EmailTemplate::renderCustomBlocks(
-                                $this->stripMergeTagSpans($this->overrideBody),
-                                $themeColors,
-                            ),
-                            $this->models,
+                        ? UtmComposer::finalize(
+                            app(TokenReplacer::class)->replace(
+                                UtmComposer::composeInlineLinks(
+                                    EmailTemplate::renderCustomBlocks(
+                                        $this->stripMergeTagSpans($this->overrideBody),
+                                        $themeColors,
+                                        $this->emailTemplate->utmDefaults(),
+                                    ),
+                                    $this->emailTemplate->utmDefaults(),
+                                ),
+                                $this->models,
+                            )
                         )
                         : $rendered['body'],
                     'preheader' => $rendered['preheader'],

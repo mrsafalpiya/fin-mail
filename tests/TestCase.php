@@ -51,6 +51,9 @@ class TestCase extends Orchestra
         $migration = include __DIR__.'/../database/migrations/create_sent_emails_table.php';
         $migration->up();
 
+        $migration = include __DIR__.'/../database/migrations/add_utm_defaults_on_email_templates_table.php';
+        $migration->up();
+
         // Create a users table for foreign keys
         $app['db']->connection()->getSchemaBuilder()->create('users', function ($table) {
             $table->id();

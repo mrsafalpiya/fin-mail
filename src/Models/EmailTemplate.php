@@ -6,6 +6,7 @@ namespace FinityLabs\FinMail\Models;
 
 use FinityLabs\FinMail\FinMailPlugin;
 use FinityLabs\FinMail\Helpers\TokenReplacer;
+use FinityLabs\FinMail\Helpers\UtmComposer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,9 @@ use Spatie\Translatable\HasTranslations;
  * @property array{address?: string, name?: string}|null $reply_to
  * @property int|null $email_theme_id
  * @property array<string, mixed>|null $token_schema
+ * @property string|null $utm_source
+ * @property string|null $utm_medium
+ * @property string|null $utm_campaign
  * @property bool $is_active
  * @property bool $is_locked
  * @property Carbon|null $created_at
@@ -59,6 +63,9 @@ class EmailTemplate extends Model
         'reply_to',
         'email_theme_id',
         'token_schema',
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
         'is_active',
         'is_locked',
     ];
@@ -205,14 +212,41 @@ class EmailTemplate extends Model
         $body = self::stripMergeTagSpans($this->body);
 
         if ($renderBlocks) {
-            $body = self::renderCustomBlocks($body, $theme);
+            $utmDefaults = $this->utmDefaults();
+            $body = self::renderCustomBlocks($body, $theme, $utmDefaults);
+            $body = UtmComposer::composeInlineLinks($body, $utmDefaults);
+        }
+
+        $body = $replacer->replace($body, $models);
+
+        if ($renderBlocks) {
+            $body = UtmComposer::finalize($body);
         }
 
         return [
             'subject' => $replacer->replace($this->subject, $models),
             'preheader' => $replacer->replace($this->preheader ?? '', $models),
-            'body' => $replacer->replace($body, $models),
+            'body' => $body,
         ];
+    }
+
+    /**
+     * Template-level UTM defaults, omitting empty values. Returns an empty
+     * array when the UTM feature is disabled.
+     *
+     * @return array<string, string>
+     */
+    public function utmDefaults(): array
+    {
+        if (! config('fin-mail.utm.enabled', true)) {
+            return [];
+        }
+
+        return array_filter([
+            'utm_source' => (string) ($this->utm_source ?? ''),
+            'utm_medium' => (string) ($this->utm_medium ?? ''),
+            'utm_campaign' => (string) ($this->utm_campaign ?? ''),
+        ], fn (string $value): bool => trim($value) !== '');
     }
 
     /**
@@ -245,14 +279,15 @@ class EmailTemplate extends Model
      * Replace custom block divs in stored HTML with their rendered output.
      *
      * @param  array<string, string>  $theme
+     * @param  array<string, string>  $utmDefaults  Template-level UTM defaults keyed by utm_* param
      */
-    public static function renderCustomBlocks(string $html, array $theme): string
+    public static function renderCustomBlocks(string $html, array $theme, array $utmDefaults = []): string
     {
         $blocks = FinMailPlugin::getCustomBlocks();
 
         return preg_replace_callback(
             '/<div\s[^>]*data-type="customBlock"[^>]*>.*?<\/div>/s',
-            function (array $matches) use ($blocks, $theme): string {
+            function (array $matches) use ($blocks, $theme, $utmDefaults): string {
                 $tag = $matches[0];
 
                 if (! preg_match('/data-id="([^"]+)"/', $tag, $idMatch)) {
@@ -271,7 +306,7 @@ class EmailTemplate extends Model
                     $config = json_decode(html_entity_decode($configMatch[1]), true) ?? [];
                 }
 
-                return $blockClass::toHtml($config, ['theme' => $theme]) ?? '';
+                return $blockClass::toHtml($config, ['theme' => $theme, 'utm_defaults' => $utmDefaults]) ?? '';
             },
             $html,
         ) ?? $html;

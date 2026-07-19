@@ -109,4 +109,22 @@ return [
         'open' => '{{',
         'close' => '}}',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | UTM Link Tracking
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, links and CTA buttons in the email body can opt in to
+    | UTM tracking. Template-level defaults (utm_source, utm_medium,
+    | utm_campaign) combine with per-link utm_content / utm_term and are
+    | appended to the link URL when the email is rendered.
+    |
+    | UTM controls are only available with the default (Filament RichEditor)
+    | editor. When disabled, no UTM fields are shown and no params are appended.
+    |
+    */
+    'utm' => [
+        'enabled' => true,
+    ],
 ];

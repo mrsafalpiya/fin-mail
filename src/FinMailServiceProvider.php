@@ -34,6 +34,7 @@ class FinMailServiceProvider extends PackageServiceProvider
                 'create_email_template_versions_table',
                 'create_sent_emails_table',
                 'add_reply_to_on_email_templates_table',
+                'add_utm_defaults_on_email_templates_table',
                 '../settings/create_attachment_settings',
                 '../settings/create_branding_settings',
                 '../settings/create_logging_settings',
