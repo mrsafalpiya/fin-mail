@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Paste multiple recipients at once** — the To / Cc / Bcc fields on the Compose Email screen now split pasted text into individual address tags on commas and newlines, so a comma-separated list or a column of addresses copied from a spreadsheet lands as separate, individually validated entries instead of a single tag. Typing a comma still commits a tag as before.
+
 ## [1.9.0] - 2026-07-15
 
 ### Added

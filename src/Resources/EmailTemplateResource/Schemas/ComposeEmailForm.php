@@ -7,7 +7,6 @@ namespace FinityLabs\FinMail\Resources\EmailTemplateResource\Schemas;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Group;
@@ -16,6 +15,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use FinityLabs\FinMail\Contracts\EditorContract;
+use FinityLabs\FinMail\Helpers\RecipientsInput;
 use FinityLabs\FinMail\Models\EmailTemplate;
 use FinityLabs\FinMail\Settings\AttachmentSettings;
 use FinityLabs\FinMail\Settings\GeneralSettings;
@@ -50,21 +50,18 @@ class ComposeEmailForm
                                     ->native(false)
                                     ->required(),
 
-                                TagsInput::make('to')
+                                RecipientsInput::make('to')
                                     ->label(__('fin-mail::fin-mail.compose.fields.to'))
                                     ->placeholder(__('fin-mail::fin-mail.compose.fields.to_placeholder'))
-                                    ->required()
-                                    ->nestedRecursiveRules(['email']),
+                                    ->required(),
 
-                                TagsInput::make('cc')
+                                RecipientsInput::make('cc')
                                     ->label(__('fin-mail::fin-mail.compose.fields.cc'))
-                                    ->placeholder(__('fin-mail::fin-mail.compose.fields.cc_placeholder'))
-                                    ->nestedRecursiveRules(['email']),
+                                    ->placeholder(__('fin-mail::fin-mail.compose.fields.cc_placeholder')),
 
-                                TagsInput::make('bcc')
+                                RecipientsInput::make('bcc')
                                     ->label(__('fin-mail::fin-mail.compose.fields.bcc'))
-                                    ->placeholder(__('fin-mail::fin-mail.compose.fields.bcc_placeholder'))
-                                    ->nestedRecursiveRules(['email']),
+                                    ->placeholder(__('fin-mail::fin-mail.compose.fields.bcc_placeholder')),
                             ])
                             ->columns(2)
                             ->collapsible(),
