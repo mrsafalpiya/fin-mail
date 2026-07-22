@@ -15,6 +15,7 @@ return [
         'templates' => 'Templates',
         'themes' => 'Themes',
         'sent-emails' => 'Sent Emails',
+        'scheduled-emails' => 'Scheduled Emails',
         'settings' => 'Settings',
     ],
 
@@ -25,6 +26,8 @@ return [
         'email_themes' => 'Email themes',
         'sent_email' => 'Sent email',
         'sent_emails' => 'Sent emails',
+        'scheduled_email' => 'Scheduled email',
+        'scheduled_emails' => 'Scheduled emails',
     ],
 
     /*
@@ -196,7 +199,16 @@ return [
 
         'actions' => [
             'send' => 'Send Email',
+            'schedule' => 'Schedule Email',
             'preview' => 'Preview',
+        ],
+
+        'schedule' => [
+            'heading' => 'Schedule Email',
+            'description' => 'Choose when this email should be sent.',
+            'description_multiple' => 'You have multiple recipients. Choose how to send this email and when it should go out.',
+            'scheduled_at' => 'Send at',
+            'timezone_hint' => 'Times are in the :timezone timezone.',
         ],
 
         'confirm' => [
@@ -213,6 +225,32 @@ return [
         'notifications' => [
             'individual_sent' => 'Emails sent',
             'individual_sent_body' => 'Sent :count individual emails.',
+            'scheduled' => 'Email scheduled',
+            'scheduled_body' => 'This email will be sent on :time.',
+        ],
+    ],
+
+    'scheduled' => [
+        'columns' => [
+            'subject' => 'Subject',
+            'to' => 'To',
+            'template' => 'Template',
+            'template_placeholder' => '—',
+            'status' => 'Status',
+            'scheduled_at' => 'Send at',
+            'scheduled_by' => 'Scheduled by',
+            'scheduled_by_placeholder' => 'System',
+        ],
+
+        'actions' => [
+            'cancel' => 'Cancel',
+            'cancel_heading' => 'Cancel scheduled email',
+            'cancel_description' => 'Are you sure you want to cancel this scheduled email? It will not be sent.',
+        ],
+
+        'notifications' => [
+            'cancelled' => 'Scheduled email cancelled',
+            'cancel_failed' => 'This email can no longer be cancelled.',
         ],
     ],
 
@@ -527,6 +565,13 @@ return [
             1 => 'Draft',
             2 => 'Queued',
             3 => 'Sent',
+            4 => 'Failed',
+        ],
+
+        'scheduled_email_status' => [
+            1 => 'Pending',
+            2 => 'Sent',
+            3 => 'Cancelled',
             4 => 'Failed',
         ],
 

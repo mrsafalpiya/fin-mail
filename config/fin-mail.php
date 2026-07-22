@@ -17,6 +17,7 @@ return [
         'versions' => 'email_template_versions',
         'themes' => 'email_themes',
         'sent' => 'sent_emails',
+        'scheduled' => 'scheduled_emails',
     ],
 
     /*

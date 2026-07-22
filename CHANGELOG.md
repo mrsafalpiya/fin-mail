@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Schedule emails for later** — the Compose Email screen gains a **Schedule Email** action beside **Send Email**. It reuses the same multi-recipient / individual-vs-combined delivery choice and adds a future date-time picker (interpreted in the app timezone). Scheduled emails are stored in a new `scheduled_emails` table and delivered by the `fin-mail:send-scheduled` command, which runs every minute and atomically claims each due row so it can never be sent twice. A new **Scheduled Emails** resource lists pending/sent/cancelled/failed schedules and lets you cancel a pending one before it fires.
 - **Paste multiple recipients at once** — the To / Cc / Bcc fields on the Compose Email screen now split pasted text into individual address tags on commas and newlines, so a comma-separated list or a column of addresses copied from a spreadsheet lands as separate, individually validated entries instead of a single tag. Typing a comma still commits a tag as before.
 
 ## [1.9.0] - 2026-07-15

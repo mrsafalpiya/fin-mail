@@ -33,6 +33,7 @@ class FinMailServiceProvider extends PackageServiceProvider
                 'create_email_templates_table',
                 'create_email_template_versions_table',
                 'create_sent_emails_table',
+                'create_scheduled_emails_table',
                 'add_reply_to_on_email_templates_table',
                 'add_utm_defaults_on_email_templates_table',
                 '../settings/create_attachment_settings',
@@ -46,6 +47,7 @@ class FinMailServiceProvider extends PackageServiceProvider
                 Commands\UninstallCommand::class,
                 Commands\UpgradeCommand::class,
                 Commands\CleanupSentEmails::class,
+                Commands\SendScheduledEmails::class,
             ]);
     }
 
@@ -128,6 +130,12 @@ class FinMailServiceProvider extends PackageServiceProvider
         $this->app->afterResolving(
             Schedule::class,
             function (Schedule $schedule): void {
+                // Scheduled-email delivery runs every minute regardless of settings.
+                $schedule->command('fin-mail:send-scheduled')
+                    ->description('Dispatch scheduled emails whose time has arrived')
+                    ->everyMinute()
+                    ->withoutOverlapping();
+
                 try {
                     $logging = app(Settings\LoggingSettings::class);
 

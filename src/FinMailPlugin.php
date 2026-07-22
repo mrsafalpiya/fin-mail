@@ -13,6 +13,7 @@ use FinityLabs\FinMail\Editors\Blocks\ButtonBlock;
 use FinityLabs\FinMail\Enums\NavigationGroup;
 use FinityLabs\FinMail\Resources\EmailTemplateResource\EmailTemplateResource;
 use FinityLabs\FinMail\Resources\EmailThemeResource\EmailThemeResource;
+use FinityLabs\FinMail\Resources\ScheduledEmailResource\ScheduledEmailResource;
 use FinityLabs\FinMail\Resources\SentEmailResource\SentEmailResource;
 use UnitEnum;
 
@@ -40,6 +41,8 @@ class FinMailPlugin implements Plugin
 
     protected ?int $sentEmailNavigationSort = 30;
 
+    protected ?int $scheduledEmailNavigationSort = 35;
+
     protected ?int $settingsNavigationSort = 40;
 
     protected string|UnitEnum|Closure|null $emailTemplateNavigationGroup = NavigationGroup::Email;
@@ -47,6 +50,8 @@ class FinMailPlugin implements Plugin
     protected string|UnitEnum|Closure|null $emailThemeNavigationGroup = NavigationGroup::Email;
 
     protected string|UnitEnum|Closure|null $sentEmailNavigationGroup = NavigationGroup::Email;
+
+    protected string|UnitEnum|Closure|null $scheduledEmailNavigationGroup = NavigationGroup::Email;
 
     protected string|UnitEnum|Closure|null $settingsNavigationGroup = NavigationGroup::Email;
 
@@ -81,6 +86,8 @@ class FinMailPlugin implements Plugin
         if ($this->evaluate($this->sentEmailsEnabled)) {
             $resources[] = SentEmailResource::class;
         }
+
+        $resources[] = ScheduledEmailResource::class;
 
         $panel
             ->discoverClusters(in: __DIR__.'/Clusters', for: 'FinityLabs\\FinMail\\Clusters')
@@ -135,6 +142,7 @@ class FinMailPlugin implements Plugin
         $this->emailTemplateNavigationGroup = $group;
         $this->emailThemeNavigationGroup = $group;
         $this->sentEmailNavigationGroup = $group;
+        $this->scheduledEmailNavigationGroup = $group;
         $this->settingsNavigationGroup = $group;
 
         return $this;
@@ -161,6 +169,13 @@ class FinMailPlugin implements Plugin
         return $this;
     }
 
+    public function scheduledEmailNavigationGroup(string|UnitEnum|Closure|null $group): static
+    {
+        $this->scheduledEmailNavigationGroup = $group;
+
+        return $this;
+    }
+
     public function settingsNavigationGroup(string|UnitEnum|Closure|null $group): static
     {
         $this->settingsNavigationGroup = $group;
@@ -174,12 +189,14 @@ class FinMailPlugin implements Plugin
             $this->emailTemplateNavigationSort = null;
             $this->emailThemeNavigationSort = null;
             $this->sentEmailNavigationSort = null;
+            $this->scheduledEmailNavigationSort = null;
             $this->settingsNavigationSort = null;
         } else {
             $this->emailTemplateNavigationSort = $sort;
             $this->emailThemeNavigationSort = $sort + 1;
             $this->sentEmailNavigationSort = $sort + 2;
-            $this->settingsNavigationSort = $sort + 3;
+            $this->scheduledEmailNavigationSort = $sort + 3;
+            $this->settingsNavigationSort = $sort + 4;
         }
 
         return $this;
@@ -206,6 +223,13 @@ class FinMailPlugin implements Plugin
         return $this;
     }
 
+    public function scheduledEmailNavigationSort(int|Closure|null $sort): static
+    {
+        $this->scheduledEmailNavigationSort = $sort;
+
+        return $this;
+    }
+
     public function settingsNavigationSort(int|Closure|null $sort): static
     {
         $this->settingsNavigationSort = $sort;
@@ -228,6 +252,11 @@ class FinMailPlugin implements Plugin
         return $this->evaluate($this->sentEmailNavigationSort);
     }
 
+    public function getScheduledEmailNavigationSort(): ?int
+    {
+        return $this->evaluate($this->scheduledEmailNavigationSort);
+    }
+
     public function getSettingsNavigationSort(): ?int
     {
         return $this->evaluate($this->settingsNavigationSort);
@@ -246,6 +275,11 @@ class FinMailPlugin implements Plugin
     public function getSentEmailNavigationGroup(): string|UnitEnum|null
     {
         return $this->evaluate($this->sentEmailNavigationGroup);
+    }
+
+    public function getScheduledEmailNavigationGroup(): string|UnitEnum|null
+    {
+        return $this->evaluate($this->scheduledEmailNavigationGroup);
     }
 
     public function getSettingsNavigationGroup(): string|UnitEnum|null

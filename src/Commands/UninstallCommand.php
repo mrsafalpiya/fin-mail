@@ -24,6 +24,7 @@ class UninstallCommand extends Command
     use ManagesThemeStyles;
 
     private const DATABASE_TABLES = [
+        'scheduled_emails',
         'sent_emails',
         'email_template_versions',
         'email_templates',
@@ -35,6 +36,7 @@ class UninstallCommand extends Command
         'create_email_templates_table.php',
         'create_email_template_versions_table.php',
         'create_sent_emails_table.php',
+        'create_scheduled_emails_table.php',
     ];
 
     private const SETTINGS_MIGRATION_FILES = [

@@ -6,6 +6,7 @@ namespace FinityLabs\FinMail\Resources\EmailTemplateResource\Pages;
 
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -15,11 +16,16 @@ use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use FinityLabs\FinMail\Actions\EmailSender;
 use FinityLabs\FinMail\Editors\Blocks\ButtonBlock;
+use FinityLabs\FinMail\Enums\ScheduledEmailStatus;
+use FinityLabs\FinMail\Helpers\RecipientGrouper;
 use FinityLabs\FinMail\Helpers\TipTapConverter;
 use FinityLabs\FinMail\Models\EmailTemplate;
+use FinityLabs\FinMail\Models\ScheduledEmail;
 use FinityLabs\FinMail\Resources\EmailTemplateResource\EmailTemplateResource;
 use FinityLabs\FinMail\Resources\EmailTemplateResource\Schemas\ComposeEmailForm;
+use FinityLabs\FinMail\Resources\ScheduledEmailResource\ScheduledEmailResource;
 use FinityLabs\FinMail\Settings\GeneralSettings;
+use Illuminate\Support\Carbon;
 
 /**
  * Full-page compose screen.
@@ -123,11 +129,44 @@ class ComposeEmail extends Page
      */
     protected function resolveRecipientGroups(array $recipients, ?string $sendMode): array
     {
-        if ($sendMode === 'individual' && count($recipients) > 1) {
-            return array_map(static fn (string $recipient): array => [$recipient], $recipients);
-        }
+        return RecipientGrouper::groups($recipients, $sendMode);
+    }
 
-        return [$recipients];
+    /**
+     * Persist the current compose form as a Pending scheduled email that the
+     * fin-mail:send-scheduled command delivers once its time arrives.
+     *
+     * @param  array<string, mixed>  $actionData  Data from the schedule modal (scheduled_at, send_mode).
+     */
+    public function schedule(array $actionData): void
+    {
+        $data = $this->form->getState();
+
+        $recipients = array_values(array_filter($data['to'] ?? []));
+
+        $payload = array_merge($data, ['template_key' => $this->record->key]);
+
+        ScheduledEmail::create([
+            'email_template_id' => $this->record->id,
+            'from_address' => $data['from'] ?? app(GeneralSettings::class)->default_from_address,
+            'to' => $recipients,
+            'subject' => $data['subject'],
+            'payload' => $payload,
+            'send_mode' => count($recipients) > 1 ? ($actionData['send_mode'] ?? null) : null,
+            'scheduled_at' => $actionData['scheduled_at'],
+            'status' => ScheduledEmailStatus::Pending,
+            'sent_by' => auth()->id(),
+        ]);
+
+        Notification::make()
+            ->title(__('fin-mail::fin-mail.compose.notifications.scheduled'))
+            ->body(__('fin-mail::fin-mail.compose.notifications.scheduled_body', [
+                'time' => Carbon::parse($actionData['scheduled_at'])->format(app('fin-mail')->dateTimeFormat() ?? 'Y-m-d H:i'),
+            ]))
+            ->success()
+            ->send();
+
+        $this->redirect(ScheduledEmailResource::getUrl('index'));
     }
 
     public function getTitle(): string
@@ -194,6 +233,31 @@ class ComposeEmail extends Page
                 ->schema(fn (): array => $this->getSendModeSchema())
                 ->action(function (array $data): void {
                     $this->send($data['send_mode'] ?? null);
+                }),
+
+            Action::make('schedule')
+                ->label(__('fin-mail::fin-mail.compose.actions.schedule'))
+                ->icon(Heroicon::OutlinedClock)
+                ->color('gray')
+                ->modalHeading(__('fin-mail::fin-mail.compose.schedule.heading'))
+                ->modalDescription(fn (): string => $this->hasMultipleRecipients()
+                    ? __('fin-mail::fin-mail.compose.schedule.description_multiple')
+                    : __('fin-mail::fin-mail.compose.schedule.description'))
+                ->modalSubmitActionLabel(__('fin-mail::fin-mail.compose.actions.schedule'))
+                ->schema(fn (): array => [
+                    ...$this->getSendModeSchema(),
+                    DateTimePicker::make('scheduled_at')
+                        ->label(__('fin-mail::fin-mail.compose.schedule.scheduled_at'))
+                        ->seconds(false)
+                        ->native(false)
+                        ->minDate(now())
+                        ->required()
+                        ->helperText(__('fin-mail::fin-mail.compose.schedule.timezone_hint', [
+                            'timezone' => config('app.timezone'),
+                        ])),
+                ])
+                ->action(function (array $data): void {
+                    $this->schedule($data);
                 }),
 
             Action::make('preview')
