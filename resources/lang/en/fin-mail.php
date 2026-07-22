@@ -209,6 +209,7 @@ return [
             'description_multiple' => 'You have multiple recipients. Choose how to send this email and when it should go out.',
             'scheduled_at' => 'Send at',
             'timezone_hint' => 'Times are in the :timezone timezone.',
+            'future_error' => 'The send time must be in the future.',
         ],
 
         'confirm' => [

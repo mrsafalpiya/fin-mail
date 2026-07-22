@@ -250,8 +250,17 @@ class ComposeEmail extends Page
                         ->label(__('fin-mail::fin-mail.compose.schedule.scheduled_at'))
                         ->seconds(false)
                         ->native(false)
-                        ->minDate(now())
+                        // Frontend only: allow today or any future date, with any
+                        // time from the start of the day (no time is disabled).
+                        ->minDate(now()->startOfDay())
                         ->required()
+                        // Backend: the real guard — the moment must be in the future.
+                        // Validated server-side on submit, so an out-of-range time
+                        // shows an inline error instead of resetting the field.
+                        ->rules(['after:now'])
+                        ->validationMessages([
+                            'after' => __('fin-mail::fin-mail.compose.schedule.future_error'),
+                        ])
                         ->helperText(__('fin-mail::fin-mail.compose.schedule.timezone_hint', [
                             'timezone' => config('app.timezone'),
                         ])),
