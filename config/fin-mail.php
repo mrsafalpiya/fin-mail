@@ -113,6 +113,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Recipient CSV Upload
+    |--------------------------------------------------------------------------
+    |
+    | When a template declares tokens in its Tokens tab, the Compose Email
+    | screen swaps its To / Cc / Bcc fields for a CSV upload: one row per
+    | recipient, with a column per token. Each row is sent as its own email
+    | with its own token values.
+    |
+    | The composer is not a bulk mailer — 'max_rows' caps how many recipients a
+    | single send may expand into, and 'max_size_kb' caps the upload itself.
+    |
+    */
+    'csv' => [
+        'max_rows' => 500,
+        'max_size_kb' => 2048,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | UTM Link Tracking
     |--------------------------------------------------------------------------
     |

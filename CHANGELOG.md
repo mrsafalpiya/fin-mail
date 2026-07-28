@@ -9,8 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Recipient CSV upload for tokenised templates** — when a template declares tokens in its Tokens tab, the Compose Email screen replaces its To / Cc / Bcc fields with a **Recipient CSV** upload: one row per recipient, with a column per token. Each row is sent as its own personalized email, so the individual/combined choice no longer applies. The file is parsed on upload and never written to disk; the summary reports mapped tokens, ignored columns, skipped invalid rows, duplicate addresses and missing values, and **View recipients** shows the parsed table before sending. A **Download CSV template** button emits the required header row with example values. Blank cells fall back to the body's `| 'fallback'` and otherwise render as nothing, so a recipient can never receive a raw `{{ token }}`. Values are HTML-escaped in the body and raw in the subject. Scheduling stores the parsed rows and expands them identically when `fin-mail:send-scheduled` fires. Row and file-size caps live under `fin-mail.csv`. Templates without tokens are unaffected.
 - **Schedule emails for later** — the Compose Email screen gains a **Schedule Email** action beside **Send Email**. It reuses the same multi-recipient / individual-vs-combined delivery choice and adds a future date-time picker (interpreted in the app timezone). Scheduled emails are stored in a new `scheduled_emails` table and delivered by the `fin-mail:send-scheduled` command, which runs every minute and atomically claims each due row so it can never be sent twice. A new **Scheduled Emails** resource lists pending/sent/cancelled/failed schedules and lets you cancel a pending one before it fires.
 - **Paste multiple recipients at once** — the To / Cc / Bcc fields on the Compose Email screen now split pasted text into individual address tags on commas and newlines, so a comma-separated list or a column of addresses copied from a spreadsheet lands as separate, individually validated entries instead of a single tag. Typing a comma still commits a tag as before.
+
+### Fixed
+
+- Tokens in a subject line composed on the Compose Email screen were delivered literally as `{{ user.name }}`. `TemplateMail` now runs token replacement over an overridden subject, as it already did for the body.
+- The **Preheader** field on the Compose Email screen was silently discarded — the template's stored preheader was sent instead. `TemplateMail` gained `overridePreheader()` and `EmailSender` now passes the composed value through, with token replacement.
 
 ## [1.9.0] - 2026-07-15
 

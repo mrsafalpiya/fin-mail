@@ -203,6 +203,43 @@ return [
             'preview' => 'Preview',
         ],
 
+        'csv' => [
+            'field' => 'Recipient CSV',
+            'helper' => 'One row per recipient. Each row is sent as its own email, using that row\'s token values.',
+            'headers' => 'Required header row: :headers',
+            'ready' => ':count recipient(s) ready.',
+            'mapped' => 'Mapped tokens: :tokens.',
+            'no_recipients' => 'No valid recipients were found in this file.',
+
+            'warnings' => [
+                'ignored_columns' => 'Ignored column(s) that match no token: :columns',
+                'invalid_rows' => 'Skipped row(s) with a blank or invalid email address: :rows',
+                'duplicate_rows' => 'Skipped duplicate address(es) on row(s): :rows',
+                'missing_values' => ':count row(s) have no value for :token — it will render as empty.',
+                'more' => 'and :count more',
+            ],
+
+            'errors' => [
+                'error_empty' => 'The CSV file is empty.',
+                'error_unreadable' => 'The CSV file could not be read.',
+                'error_missing_email_column' => 'The CSV must have a header row containing a column named "email".',
+                'error_too_many_rows' => 'The CSV has more than :max recipients, which is the configured maximum.',
+                'required' => 'Upload a recipient CSV before sending.',
+            ],
+
+            'actions' => [
+                'download_template' => 'Download CSV template',
+                'view_recipients' => 'View recipients',
+            ],
+
+            'preview' => [
+                'heading' => 'Recipients',
+                'email' => 'Email',
+                'empty_value' => '—',
+                'truncated' => 'Showing the first :shown of :total recipients.',
+            ],
+        ],
+
         'schedule' => [
             'heading' => 'Schedule Email',
             'description' => 'Choose when this email should be sent.',

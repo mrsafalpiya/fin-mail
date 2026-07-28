@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use FinityLabs\FinMail\Actions\EmailSender;
 use FinityLabs\FinMail\Editors\Blocks\ButtonBlock;
 use FinityLabs\FinMail\Enums\ScheduledEmailStatus;
+use FinityLabs\FinMail\Helpers\RecipientCsvResult;
 use FinityLabs\FinMail\Helpers\RecipientGrouper;
 use FinityLabs\FinMail\Helpers\TipTapConverter;
 use FinityLabs\FinMail\Models\EmailTemplate;
@@ -63,14 +64,27 @@ class ComposeEmail extends Page
         $this->form->fill([
             'template_key' => $record->key,
             'from' => $record->from['address'] ?? app(GeneralSettings::class)->default_from_address,
-            'to' => array_filter([auth()->user()?->email]),
-            'cc' => [],
-            'bcc' => [],
+            // A tokenised template takes its recipients from the CSV instead, so
+            // there is no To / Cc / Bcc field to seed.
+            ...$this->csvMode() ? [] : [
+                'to' => array_filter([auth()->user()?->email]),
+                'cc' => [],
+                'bcc' => [],
+            ],
             'locale' => $locale,
             'subject' => $rendered['subject'],
             'preheader' => $rendered['preheader'],
             'body' => $rendered['body'],
         ]);
+    }
+
+    /**
+     * Whether this template needs a per-recipient token value for every send,
+     * which is what swaps the recipient fields for a CSV upload.
+     */
+    public function csvMode(): bool
+    {
+        return $this->record->csvTokens() !== [];
     }
 
     public function form(Schema $schema): Schema
@@ -83,16 +97,19 @@ class ComposeEmail extends Page
      */
     public function send(?string $sendMode = null): void
     {
-        $data = $this->form->getState();
+        $data = $this->composePayload($this->form->getState());
 
-        $recipients = array_values(array_filter($data['to'] ?? []));
-        $groups = $this->resolveRecipientGroups($recipients, $sendMode);
+        if ($data === null) {
+            return;
+        }
+
+        $groups = RecipientGrouper::sendGroups($data, $sendMode);
 
         $sentCount = 0;
 
         foreach ($groups as $group) {
             $sender = new EmailSender(
-                data: array_merge($data, ['to' => $group]),
+                data: array_merge($data, $group),
                 record: null,
                 templateKey: $this->record->key,
                 notify: count($groups) === 1,
@@ -133,6 +150,45 @@ class ComposeEmail extends Page
     }
 
     /**
+     * Turn validated form state into the payload that EmailSender replays.
+     *
+     * In CSV mode the uploaded file itself is dropped — only the parsed rows
+     * travel onward, which is what makes the payload safe to persist for a
+     * scheduled send. Returns null when there is nothing to send, having
+     * already told the user why.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function composePayload(array $data): ?array
+    {
+        $csvState = $this->data['recipient_csv_data'] ?? null;
+
+        unset($data['recipient_csv']);
+
+        if (! $this->csvMode()) {
+            return $data;
+        }
+
+        $result = RecipientCsvResult::fromArray($csvState);
+
+        if ($result->isEmpty()) {
+            Notification::make()
+                ->title(__('fin-mail::fin-mail.compose.csv.errors.required'))
+                ->danger()
+                ->send();
+
+            return null;
+        }
+
+        $data['csv_rows'] = $result->rows;
+        $data['to'] = $result->emails();
+
+        return $data;
+    }
+
+    /**
      * Persist the current compose form as a Pending scheduled email that the
      * fin-mail:send-scheduled command delivers once its time arrives.
      *
@@ -140,11 +196,20 @@ class ComposeEmail extends Page
      */
     public function schedule(array $actionData): void
     {
-        $data = $this->form->getState();
+        $data = $this->composePayload($this->form->getState());
+
+        if ($data === null) {
+            return;
+        }
 
         $recipients = array_values(array_filter($data['to'] ?? []));
 
         $payload = array_merge($data, ['template_key' => $this->record->key]);
+
+        // A CSV batch is always one email per row, whatever the modal offered.
+        $sendMode = $this->csvMode()
+            ? 'individual'
+            : ($actionData['send_mode'] ?? null);
 
         ScheduledEmail::create([
             'email_template_id' => $this->record->id,
@@ -152,7 +217,7 @@ class ComposeEmail extends Page
             'to' => $recipients,
             'subject' => $data['subject'],
             'payload' => $payload,
-            'send_mode' => count($recipients) > 1 ? ($actionData['send_mode'] ?? null) : null,
+            'send_mode' => count($recipients) > 1 ? $sendMode : null,
             'scheduled_at' => $actionData['scheduled_at'],
             'status' => ScheduledEmailStatus::Pending,
             'sent_by' => auth()->id(),
@@ -187,6 +252,10 @@ class ComposeEmail extends Page
 
     private function hasMultipleRecipients(): bool
     {
+        if ($this->csvMode()) {
+            return RecipientCsvResult::fromArray($this->data['recipient_csv_data'] ?? null)->count() > 1;
+        }
+
         return count(array_filter($this->data['to'] ?? [])) > 1;
     }
 
@@ -194,11 +263,14 @@ class ComposeEmail extends Page
      * The delivery-mode chooser shown in the send modal, only when there is
      * more than one "To" recipient. A single recipient needs no choice.
      *
+     * CSV mode offers none either: each row carries its own token values, so a
+     * combined email addressed to everyone could only be right for one of them.
+     *
      * @return list<Radio>
      */
     private function getSendModeSchema(): array
     {
-        if (! $this->hasMultipleRecipients()) {
+        if ($this->csvMode() || ! $this->hasMultipleRecipients()) {
             return [];
         }
 

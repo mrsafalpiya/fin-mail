@@ -231,6 +231,29 @@ class EmailTemplate extends Model
     }
 
     /**
+     * The declared tokens that need a per-recipient value, i.e. everything in
+     * the Tokens tab except `config.*` entries — those resolve from Laravel's
+     * config on their own and would be absurd to repeat on every CSV row.
+     *
+     * This list drives three things at once, so they can never disagree: whether
+     * the compose screen switches to CSV mode, which headers the CSV must carry,
+     * and which tokens are blanked out when a row leaves them empty.
+     *
+     * @return list<string>
+     */
+    public function csvTokens(): array
+    {
+        return collect($this->token_schema ?? [])
+            ->pluck('token')
+            ->map(fn (mixed $token): string => trim((string) $token))
+            ->filter()
+            ->reject(fn (string $token): bool => str_starts_with($token, 'config.'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Template-level UTM defaults, omitting empty values. Returns an empty
      * array when the UTM feature is disabled.
      *

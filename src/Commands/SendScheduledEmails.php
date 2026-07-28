@@ -57,15 +57,16 @@ class SendScheduledEmails extends Command
     {
         $data = $scheduled->payload;
 
-        $recipients = array_values(array_filter($data['to'] ?? []));
-        $groups = RecipientGrouper::groups($recipients, $scheduled->send_mode);
+        // Shared with the compose page, so a CSV batch expands into the same
+        // per-recipient emails whether it goes out now or in three days.
+        $groups = RecipientGrouper::sendGroups($data, $scheduled->send_mode);
 
         $sentCount = 0;
 
         foreach ($groups as $group) {
             try {
                 $sender = new EmailSender(
-                    data: array_merge($data, ['to' => $group]),
+                    data: array_merge($data, $group),
                     record: null,
                     templateKey: $data['template_key'] ?? null,
                     notify: false,

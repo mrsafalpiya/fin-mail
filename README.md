@@ -18,6 +18,7 @@ A powerful email template manager and composer for Filament. Build, manage, and 
 - **Dynamic Templates** — No need for separate Mailable classes per template. One universal `TemplateMail` handles everything
 - **Token Replacement** — `{{ user.name }}`, `{{ config.app.name }}`, conditionals `{% if user.is_premium %}`, and fallbacks `{{ user.name | 'Customer' }}`
 - **Merge Tags** — Tokens are available as merge tags directly in the RichEditor toolbar for easy insertion
+- **Recipient CSV Upload** — Compose a tokenised template by uploading a CSV of recipients and their token values; each row is sent as its own personalized email
 - **CTA Button Block** — Insert styled call-to-action buttons from the editor with configurable label, URL, and alignment
 - **Template Versioning** — Automatic version history with preview and one-click restore
 - **Email Logging** — Every sent email is logged with status tracking, rendered body storage, and polymorphic model association
@@ -268,6 +269,34 @@ $invoice->sentEmailsCount();                  // Count
 
 When editing a template, any tokens defined in the Tokens tab are available as merge tags in the RichEditor toolbar. Click the merge tags button to browse and insert them directly into the email body.
 
+### Recipient CSV upload
+
+A template that declares tokens in its Tokens tab cannot be composed against a typed recipient list — there would be nowhere to put each person's values. So when a template has at least one non-`config.*` token, the Compose Email screen replaces its To / Cc / Bcc fields with a **Recipient CSV** upload. Templates without tokens are unaffected and keep the normal recipient fields.
+
+The file needs a header row with a column named `email`, plus one column per token:
+
+```csv
+email,user.name,invoice.total
+alice@example.com,Alice,$120.00
+bob@example.com,Bob,$40.00
+```
+
+Use **Download CSV template** on the compose screen to get this header row pre-filled, with an example row built from each token's documented example value.
+
+Column headers are matched against the template's declared tokens (braces are optional — `{{ user.name }}` works too). A dotted token nests exactly as a model attribute would, so `user.name` resolves the same whether it came from a CSV or from `->models(['user' => $user])`. Columns matching no token — an `id` or `notes` column left over from a spreadsheet export — are ignored and reported rather than rejected.
+
+On upload the file is parsed immediately and never written to disk. The summary reports how many recipients are ready, which tokens were mapped, and any warnings: ignored columns, rows skipped for a blank or invalid address, duplicate addresses (the first occurrence wins), and how many rows are missing a value for each token. **View recipients** shows the parsed table so you can check values landed on the right people before sending.
+
+On send, **each row becomes its own email** with its own token values — the individual/combined choice does not apply. Scheduling works the same way: the parsed rows are stored with the schedule and expanded when `fin-mail:send-scheduled` fires.
+
+A few details worth knowing:
+
+- A blank cell falls back to the token's `| 'fallback'` if the body declares one, and otherwise renders as nothing. A recipient never receives a raw `{{ user.name }}` for a declared token.
+- Values are HTML-escaped in the body, so `Smith & Sons` renders correctly and a CSV from an untrusted source cannot inject markup. The subject line receives the raw value.
+- `config.*` tokens resolve on their own and are never asked for as a column.
+- Delimiters (`,`, `;`, tab, `|`), a UTF-8 BOM, CRLF line endings, and quoted values are all handled.
+- Row and file-size caps are configurable — see `fin-mail.csv` in the config.
+
 ### CTA Button block
 
 The editor includes a built-in Button custom block. Click the custom blocks button (squares-plus icon) in the toolbar, select "Button", and configure:
@@ -439,6 +468,19 @@ use FinityLabs\FinMail\Facades\FinMail;
 FinMail::dateFormat();     // string|null for current locale
 FinMail::dateTimeFormat(); // string|null for current locale
 ```
+
+### Recipient CSV limits
+
+The compose screen is not a bulk mailer, so a CSV batch is capped:
+
+```php
+'csv' => [
+    'max_rows' => 500,     // recipients a single send may expand into
+    'max_size_kb' => 2048, // upload size limit
+],
+```
+
+A file over either limit is rejected at upload with a message saying so.
 
 Other publish tags:
 

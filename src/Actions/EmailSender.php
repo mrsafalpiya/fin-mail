@@ -10,6 +10,7 @@ use FinityLabs\FinMail\Enums\EmailStatus;
 use FinityLabs\FinMail\Events\EmailFailed;
 use FinityLabs\FinMail\Events\EmailSending;
 use FinityLabs\FinMail\Events\EmailSent;
+use FinityLabs\FinMail\Helpers\TokenRowModels;
 use FinityLabs\FinMail\Mail\TemplateMail;
 use FinityLabs\FinMail\Models\EmailTemplate;
 use FinityLabs\FinMail\Models\SentEmail;
@@ -53,11 +54,15 @@ class EmailSender
             }
 
             $mail = TemplateMail::make($templateKey, $this->data['locale'] ?? null)
-                ->models($this->resolveModels())
                 ->overrideSubject($this->data['subject'])
                 ->overrideBody($this->data['body'])
                 ->withLogging($this->sentEmailLog);
 
+            if (filled($this->data['preheader'] ?? null)) {
+                $mail->overridePreheader($this->data['preheader']);
+            }
+
+            $this->applyTokenValues($mail);
             $this->applyFromOverride($mail);
 
             foreach ($this->resolveAttachments() as $attachment) {
@@ -146,6 +151,32 @@ class EmailSender
             'sendable_type' => $this->record?->getMorphClass(),
             'sendable_id' => $this->record?->getKey(),
         ]);
+    }
+
+    /**
+     * Feed this recipient's own token values into the mailable.
+     *
+     * `token_values` is set per email by the CSV batch; without it the mailable
+     * just gets whatever models the caller resolved, exactly as before. The body
+     * gets an escaped copy of the values while the subject and preheader keep
+     * the raw ones, and every token the template declares is marked blankable so
+     * a gap in the file cannot reach the inbox as literal `{{ ... }}`.
+     */
+    protected function applyTokenValues(TemplateMail $mail): void
+    {
+        $models = $this->resolveModels();
+
+        if (! array_key_exists('token_values', $this->data) || ! is_array($this->data['token_values'])) {
+            $mail->models($models);
+
+            return;
+        }
+
+        $tokenValues = $this->data['token_values'];
+
+        $mail->models(array_merge($models, TokenRowModels::build($tokenValues)))
+            ->bodyModels(array_merge($models, TokenRowModels::build($tokenValues, escape: true)))
+            ->blankTokens($this->resolveTemplateModel()?->csvTokens() ?? []);
     }
 
     protected function applyFromOverride(TemplateMail $mail): void

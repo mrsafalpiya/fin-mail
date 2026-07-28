@@ -37,25 +37,32 @@ class TokenReplacer
      * Replace all tokens in the given content.
      *
      * @param  array<string, mixed>  $models  Keyed by prefix: ['user' => $userModel, 'invoice' => $invoiceModel]
+     * @param  array<int, string>  $blankTokens  Tokens that render as nothing when they resolve to no value,
+     *                                           instead of being left as literal `{{ token }}`. Used when the
+     *                                           values come from a source that is expected to cover every token
+     *                                           — a recipient CSV — so a gap can never reach the recipient's
+     *                                           inbox as raw template syntax. Any `| 'fallback'` still wins.
      */
-    public function replace(string $content, array $models = []): string
+    public function replace(string $content, array $models = [], array $blankTokens = []): string
     {
         $content = $this->replaceConditionals($content, $models);
 
-        return $this->replaceSimpleTokens($content, $models);
+        return $this->replaceSimpleTokens($content, $models, $blankTokens);
     }
 
     /**
      * Replace simple {{ model.attribute }} and {{ config.key }} tokens.
+     *
+     * @param  array<int, string>  $blankTokens
      */
-    protected function replaceSimpleTokens(string $content, array $models): string
+    protected function replaceSimpleTokens(string $content, array $models, array $blankTokens = []): string
     {
         $open = preg_quote($this->open, '/');
         $close = preg_quote($this->close, '/');
 
         $pattern = "/{$open}\s*(.+?)\s*{$close}/";
 
-        return (string) preg_replace_callback($pattern, function (array $matches) use ($models): string {
+        return (string) preg_replace_callback($pattern, function (array $matches) use ($models, $blankTokens): string {
             $expression = trim($matches[1]);
 
             $fallback = null;
@@ -65,6 +72,10 @@ class TokenReplacer
             }
 
             $value = $this->resolveToken($expression, $models);
+
+            if ($value === null && $fallback === null && in_array($expression, $blankTokens, true)) {
+                return '';
+            }
 
             return $value ?? $fallback ?? $matches[0];
         }, $content);

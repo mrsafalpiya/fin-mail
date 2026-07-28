@@ -43,6 +43,18 @@ class TemplateMail extends Mailable implements ShouldQueue
     /** @var array<string, mixed> */
     protected array $models = [];
 
+    /**
+     * Models used for the body only. When set they replace {@see $models} while
+     * rendering the HTML body, so values can be escaped there without turning
+     * the subject line into entities.
+     *
+     * @var array<string, mixed>|null
+     */
+    protected ?array $bodyModels = null;
+
+    /** @var array<int, string> */
+    protected array $blankTokens = [];
+
     /** @var array<int, array{path: string, name: ?string, mime: ?string}> */
     protected array $fileAttachments = [];
 
@@ -54,6 +66,8 @@ class TemplateMail extends Mailable implements ShouldQueue
     protected ?string $overrideSubject = null;
 
     protected ?string $overrideBody = null;
+
+    protected ?string $overridePreheader = null;
 
     protected ?string $overrideView = null;
 
@@ -102,6 +116,32 @@ class TemplateMail extends Mailable implements ShouldQueue
         return $this;
     }
 
+    /**
+     * Models used only when rendering the body, leaving the subject and
+     * preheader on the values passed to {@see models()}.
+     *
+     * @param  array<string, mixed>  $models
+     */
+    public function bodyModels(array $models): static
+    {
+        $this->bodyModels = $models;
+
+        return $this;
+    }
+
+    /**
+     * Tokens that render as nothing when they resolve to no value, rather than
+     * being left as literal `{{ token }}` in the delivered email.
+     *
+     * @param  array<int, string>  $tokens
+     */
+    public function blankTokens(array $tokens): static
+    {
+        $this->blankTokens = $tokens;
+
+        return $this;
+    }
+
     public function attachFile(string $path, ?string $name = null, ?string $mime = null): static
     {
         $this->fileAttachments[] = compact('path', 'name', 'mime');
@@ -128,6 +168,13 @@ class TemplateMail extends Mailable implements ShouldQueue
     public function overrideBody(string $body): static
     {
         $this->overrideBody = $body;
+
+        return $this;
+    }
+
+    public function overridePreheader(string $preheader): static
+    {
+        $this->overridePreheader = $preheader;
 
         return $this;
     }
@@ -189,7 +236,12 @@ class TemplateMail extends Mailable implements ShouldQueue
         return new Envelope(
             from: new Address($from['address'], $from['name'] ?? ''),
             replyTo: filled($replyTo) ? [new Address($replyTo['address'], $replyTo['name'] ?? '')] : [],
-            subject: $this->overrideSubject ?? $rendered['subject'],
+            // An overridden subject comes straight from the composer, so it has
+            // never been through token replacement — do it here, or a token
+            // typed into the subject line ships as literal `{{ ... }}`.
+            subject: $this->overrideSubject !== null
+                ? $this->replaceTokens($this->overrideSubject, $this->models)
+                : $rendered['subject'],
         );
     }
 
@@ -204,7 +256,7 @@ class TemplateMail extends Mailable implements ShouldQueue
                 [
                     'body' => $this->overrideBody
                         ? UtmComposer::finalize(
-                            app(TokenReplacer::class)->replace(
+                            $this->replaceTokens(
                                 UtmComposer::composeInlineLinks(
                                     EmailTemplate::renderCustomBlocks(
                                         $this->stripMergeTagSpans($this->overrideBody),
@@ -213,11 +265,13 @@ class TemplateMail extends Mailable implements ShouldQueue
                                     ),
                                     $this->emailTemplate->utmDefaults(),
                                 ),
-                                $this->models,
+                                $this->bodyModels ?? $this->models,
                             )
                         )
                         : $rendered['body'],
-                    'preheader' => $rendered['preheader'],
+                    'preheader' => $this->overridePreheader !== null
+                        ? $this->replaceTokens($this->overridePreheader, $this->models)
+                        : $rendered['preheader'],
                     'theme' => $themeColors,
                     'branding' => $this->resolveBranding(),
                 ],
@@ -330,6 +384,14 @@ class TemplateMail extends Mailable implements ShouldQueue
     public function getTemplate(): EmailTemplate
     {
         return $this->emailTemplate;
+    }
+
+    /**
+     * @param  array<string, mixed>  $models
+     */
+    protected function replaceTokens(string $content, array $models): string
+    {
+        return app(TokenReplacer::class)->replace($content, $models, $this->blankTokens);
     }
 
     protected function stripMergeTagSpans(string $html): string
