@@ -66,6 +66,7 @@ class ScheduledEmailResource extends Resource
     {
         return [
             'index' => Pages\ListScheduledEmails::route('/'),
+            'edit' => Pages\EditScheduledEmail::route('/{record}/edit'),
         ];
     }
 }

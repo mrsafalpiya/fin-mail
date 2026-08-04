@@ -19,6 +19,7 @@ A powerful email template manager and composer for Filament. Build, manage, and 
 - **Token Replacement** — `{{ user.name }}`, `{{ config.app.name }}`, conditionals `{% if user.is_premium %}`, and fallbacks `{{ user.name | 'Customer' }}`
 - **Merge Tags** — Tokens are available as merge tags directly in the RichEditor toolbar for easy insertion
 - **Recipient CSV Upload** — Compose a tokenised template by uploading a CSV of recipients and their token values; each row is sent as its own personalized email
+- **Scheduled Sending** — Schedule a compose for a future time, then edit or cancel it from the Scheduled Emails screen right up until it fires
 - **CTA Button Block** — Insert styled call-to-action buttons from the editor with configurable label, URL, and alignment
 - **Template Versioning** — Automatic version history with preview and one-click restore
 - **Email Logging** — Every sent email is logged with status tracking, rendered body storage, and polymorphic model association
@@ -296,6 +297,26 @@ A few details worth knowing:
 - `config.*` tokens resolve on their own and are never asked for as a column.
 - Delimiters (`,`, `;`, tab, `|`), a UTF-8 BOM, CRLF line endings, and quoted values are all handled.
 - Row and file-size caps are configurable — see `fin-mail.csv` in the config.
+
+### Scheduling emails
+
+**Schedule Email** on the compose screen stores the composed email and sends it later. It takes the same individual-vs-combined delivery choice as an immediate send, plus a send time interpreted in the app timezone (`config('app.timezone')`); the time must be in the future. Delivery is done by `fin-mail:send-scheduled`, registered to run every minute, which claims each due row atomically before sending so an overlapping run can never send it twice.
+
+The **Scheduled Emails** screen lists every schedule with its status — pending, sent, cancelled or failed — and offers two actions on a pending one:
+
+- **Cancel** — the schedule will not be sent. Cancelling is final; a cancelled schedule cannot be re-armed.
+- **Edit** — reopens the composer for that schedule.
+
+Editing loads the composer filled from what was scheduled, not from the template, so a template edited after scheduling does not change an email already queued. Everything is editable: recipients, subject, preheader, body, attachments, locale, delivery mode and send time. **Update Schedule** rewrites the same row — it never creates a second schedule.
+
+Two things worth knowing about editing:
+
+- **Changing the locale reloads the subject, preheader and body from the template**, discarding your edits to them, exactly as it does when composing. That is how you pull in another language's content; it is also the one way to lose work on this screen.
+- **A schedule can fire while you have it open.** The sender claims a due row before sending, and an edit that arrives after that is refused rather than written to a row whose content has already gone out. You are told so and returned to the list. Nothing is sent twice.
+
+Edit is offered only for a pending schedule whose template still exists. Deleting a template leaves its schedules pointing at nothing — they cannot be edited, and will fail when their time comes, since delivery resolves the template by key.
+
+For a tokenised template the schedule stores the parsed CSV rows, so the editor opens with those recipients already loaded and the upload field optional. Leave it empty to keep them; upload another file to replace the whole list.
 
 ### CTA Button block
 

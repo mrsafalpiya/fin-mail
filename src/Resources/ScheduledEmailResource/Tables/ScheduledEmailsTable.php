@@ -12,6 +12,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use FinityLabs\FinMail\Enums\ScheduledEmailStatus;
 use FinityLabs\FinMail\Models\ScheduledEmail;
+use FinityLabs\FinMail\Resources\ScheduledEmailResource\ScheduledEmailResource;
 
 class ScheduledEmailsTable
 {
@@ -59,6 +60,15 @@ class ScheduledEmailsTable
                     ->options(ScheduledEmailStatus::class),
             ])
             ->recordActions([
+                Action::make('edit')
+                    ->label(__('fin-mail::fin-mail.scheduled.actions.edit'))
+                    ->icon(Heroicon::OutlinedPencilSquare)
+                    // Only a pending schedule is still changeable, and the edit
+                    // screen is the composer — which cannot be built without the
+                    // template the schedule was composed from.
+                    ->visible(fn (ScheduledEmail $record): bool => $record->isCancellable() && $record->template !== null)
+                    ->url(fn (ScheduledEmail $record): string => ScheduledEmailResource::getUrl('edit', ['record' => $record])),
+
                 Action::make('cancel')
                     ->label(__('fin-mail::fin-mail.scheduled.actions.cancel'))
                     ->icon(Heroicon::OutlinedNoSymbol)

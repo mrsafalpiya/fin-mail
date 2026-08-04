@@ -126,6 +126,41 @@ class ScheduledEmail extends Model
         return $this->status === ScheduledEmailStatus::Pending;
     }
 
+    /**
+     * Apply an edit, but only while this schedule is still waiting to go out.
+     *
+     * fin-mail:send-scheduled claims a due row by flipping Pending -> Sent
+     * before it sends anything, so this conditional UPDATE is the whole race
+     * guard: an edit that loses it is an edit to an email already on its way,
+     * and is dropped rather than written to a row whose content has shipped.
+     *
+     * Values are set on the model first so casts apply, then written through
+     * the query builder — which is what makes the check and the write one
+     * statement.
+     *
+     * @param  array<string, mixed>  $attributes
+     *
+     * @return bool Whether the edit was applied.
+     */
+    public function updateIfPending(array $attributes): bool
+    {
+        $this->fill($attributes);
+
+        $values = $this->getDirty();
+        $values['updated_at'] = $this->freshTimestampString();
+
+        $applied = static::query()
+            ->whereKey($this->getKey())
+            ->where('status', ScheduledEmailStatus::Pending)
+            ->update($values);
+
+        // Either way the model must match the row again: on success to pick up
+        // the new timestamp, on failure to discard the edit that never landed.
+        $this->refresh();
+
+        return $applied > 0;
+    }
+
     public function markAsSent(): void
     {
         $this->update([

@@ -34,7 +34,10 @@ class ComposeEmailForm
     /** How many line numbers a warning lists before collapsing into "and N more". */
     private const MAX_LISTED_ROWS = 10;
 
-    public static function configure(Schema $schema, EmailTemplate $record): Schema
+    /**
+     * @param  bool  $requireCsvUpload  Whether a recipient CSV must be uploaded before this compose can go anywhere. False when the compose already carries recipients parsed from an earlier upload.
+     */
+    public static function configure(Schema $schema, EmailTemplate $record, bool $requireCsvUpload = true): Schema
     {
         $editor = app(EditorContract::class);
 
@@ -62,7 +65,7 @@ class ComposeEmailForm
                                     ->native(false)
                                     ->required(),
 
-                                ...self::recipientComponents($record),
+                                ...self::recipientComponents($record, $requireCsvUpload),
                             ])
                             ->columns(2)
                             ->collapsible(),
@@ -154,7 +157,7 @@ class ComposeEmailForm
      *
      * @return array<int, Component>
      */
-    protected static function recipientComponents(EmailTemplate $record): array
+    protected static function recipientComponents(EmailTemplate $record, bool $requireCsvUpload = true): array
     {
         $csvTokens = $record->csvTokens();
 
@@ -182,7 +185,10 @@ class ComposeEmailForm
                     __('fin-mail::fin-mail.compose.csv.helper').' '.
                     __('fin-mail::fin-mail.compose.csv.headers', [
                         'headers' => implode(',', self::csvHeaderRow($csvTokens)),
-                    ])
+                    ]).
+                    // Editing a schedule starts with the recipients its original
+                    // file produced, so say what uploading another one does.
+                    ($requireCsvUpload ? '' : ' '.__('fin-mail::fin-mail.compose.csv.replace_helper'))
                 )
                 ->acceptedFileTypes(['text/csv', 'text/plain', 'application/csv', 'application/vnd.ms-excel'])
                 // Parsed on upload and never written to disk: a file of customer
@@ -190,7 +196,7 @@ class ComposeEmailForm
                 // the parsed rows are all that send and schedule need.
                 ->storeFiles(false)
                 ->maxSize((int) config('fin-mail.csv.max_size_kb', 2048))
-                ->required()
+                ->required($requireCsvUpload)
                 ->live()
                 ->afterStateUpdated(function (mixed $state, Set $set) use ($csvTokens): void {
                     $file = is_array($state) ? Arr::first($state) : $state;

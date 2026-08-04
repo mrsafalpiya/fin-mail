@@ -6,24 +6,19 @@ namespace FinityLabs\FinMail\Resources\EmailTemplateResource\Pages;
 
 use BackedEnum;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use FinityLabs\FinMail\Actions\EmailSender;
 use FinityLabs\FinMail\Editors\Blocks\ButtonBlock;
 use FinityLabs\FinMail\Enums\ScheduledEmailStatus;
-use FinityLabs\FinMail\Helpers\RecipientCsvResult;
 use FinityLabs\FinMail\Helpers\RecipientGrouper;
-use FinityLabs\FinMail\Helpers\TipTapConverter;
 use FinityLabs\FinMail\Models\EmailTemplate;
 use FinityLabs\FinMail\Models\ScheduledEmail;
+use FinityLabs\FinMail\Resources\Concerns\ComposesEmail;
 use FinityLabs\FinMail\Resources\EmailTemplateResource\EmailTemplateResource;
-use FinityLabs\FinMail\Resources\EmailTemplateResource\Schemas\ComposeEmailForm;
 use FinityLabs\FinMail\Resources\ScheduledEmailResource\ScheduledEmailResource;
 use FinityLabs\FinMail\Settings\GeneralSettings;
 use Illuminate\Support\Carbon;
@@ -37,6 +32,7 @@ use Illuminate\Support\Carbon;
  */
 class ComposeEmail extends Page
 {
+    use ComposesEmail;
     use InteractsWithForms;
 
     protected static string $resource = EmailTemplateResource::class;
@@ -46,9 +42,6 @@ class ComposeEmail extends Page
     protected static ?string $title = null;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPaperAirplane;
-
-    /** @var array<string, mixed>|null */
-    public ?array $data = [];
 
     public EmailTemplate $record;
 
@@ -78,18 +71,14 @@ class ComposeEmail extends Page
         ]);
     }
 
-    /**
-     * Whether this template needs a per-recipient token value for every send,
-     * which is what swaps the recipient fields for a CSV upload.
-     */
-    public function csvMode(): bool
-    {
-        return $this->record->csvTokens() !== [];
-    }
-
     public function form(Schema $schema): Schema
     {
-        return ComposeEmailForm::configure($schema, $this->record);
+        return $this->composeForm($schema);
+    }
+
+    public function template(): EmailTemplate
+    {
+        return $this->record;
     }
 
     /**
@@ -150,45 +139,6 @@ class ComposeEmail extends Page
     }
 
     /**
-     * Turn validated form state into the payload that EmailSender replays.
-     *
-     * In CSV mode the uploaded file itself is dropped — only the parsed rows
-     * travel onward, which is what makes the payload safe to persist for a
-     * scheduled send. Returns null when there is nothing to send, having
-     * already told the user why.
-     *
-     * @param  array<string, mixed>  $data
-     *
-     * @return array<string, mixed>|null
-     */
-    protected function composePayload(array $data): ?array
-    {
-        $csvState = $this->data['recipient_csv_data'] ?? null;
-
-        unset($data['recipient_csv']);
-
-        if (! $this->csvMode()) {
-            return $data;
-        }
-
-        $result = RecipientCsvResult::fromArray($csvState);
-
-        if ($result->isEmpty()) {
-            Notification::make()
-                ->title(__('fin-mail::fin-mail.compose.csv.errors.required'))
-                ->danger()
-                ->send();
-
-            return null;
-        }
-
-        $data['csv_rows'] = $result->rows;
-        $data['to'] = $result->emails();
-
-        return $data;
-    }
-
-    /**
      * Persist the current compose form as a Pending scheduled email that the
      * fin-mail:send-scheduled command delivers once its time arrives.
      *
@@ -202,23 +152,9 @@ class ComposeEmail extends Page
             return;
         }
 
-        $recipients = array_values(array_filter($data['to'] ?? []));
-
-        $payload = array_merge($data, ['template_key' => $this->record->key]);
-
-        // A CSV batch is always one email per row, whatever the modal offered.
-        $sendMode = $this->csvMode()
-            ? 'individual'
-            : ($actionData['send_mode'] ?? null);
-
         ScheduledEmail::create([
+            ...$this->scheduleAttributes($data, $actionData),
             'email_template_id' => $this->record->id,
-            'from_address' => $data['from'] ?? app(GeneralSettings::class)->default_from_address,
-            'to' => $recipients,
-            'subject' => $data['subject'],
-            'payload' => $payload,
-            'send_mode' => count($recipients) > 1 ? $sendMode : null,
-            'scheduled_at' => $actionData['scheduled_at'],
             'status' => ScheduledEmailStatus::Pending,
             'sent_by' => auth()->id(),
         ]);
@@ -237,57 +173,6 @@ class ComposeEmail extends Page
     public function getTitle(): string
     {
         return __('fin-mail::fin-mail.compose.title_with_name', ['name' => $this->record->name]);
-    }
-
-    private function getPreviewHtml(): string
-    {
-        $body = $this->data['body'] ?? '';
-
-        if (is_array($body)) {
-            return TipTapConverter::toHtml($body);
-        }
-
-        return $body;
-    }
-
-    private function hasMultipleRecipients(): bool
-    {
-        if ($this->csvMode()) {
-            return RecipientCsvResult::fromArray($this->data['recipient_csv_data'] ?? null)->count() > 1;
-        }
-
-        return count(array_filter($this->data['to'] ?? [])) > 1;
-    }
-
-    /**
-     * The delivery-mode chooser shown in the send modal, only when there is
-     * more than one "To" recipient. A single recipient needs no choice.
-     *
-     * CSV mode offers none either: each row carries its own token values, so a
-     * combined email addressed to everyone could only be right for one of them.
-     *
-     * @return list<Radio>
-     */
-    private function getSendModeSchema(): array
-    {
-        if ($this->csvMode() || ! $this->hasMultipleRecipients()) {
-            return [];
-        }
-
-        return [
-            Radio::make('send_mode')
-                ->label(__('fin-mail::fin-mail.compose.confirm.send_mode_label'))
-                ->options([
-                    'individual' => __('fin-mail::fin-mail.compose.confirm.send_mode_individual'),
-                    'combined' => __('fin-mail::fin-mail.compose.confirm.send_mode_combined'),
-                ])
-                ->descriptions([
-                    'individual' => __('fin-mail::fin-mail.compose.confirm.send_mode_individual_help'),
-                    'combined' => __('fin-mail::fin-mail.compose.confirm.send_mode_combined_help'),
-                ])
-                ->default('individual')
-                ->required(),
-        ];
     }
 
     protected function getHeaderActions(): array
@@ -316,45 +201,12 @@ class ComposeEmail extends Page
                     ? __('fin-mail::fin-mail.compose.schedule.description_multiple')
                     : __('fin-mail::fin-mail.compose.schedule.description'))
                 ->modalSubmitActionLabel(__('fin-mail::fin-mail.compose.actions.schedule'))
-                ->schema(fn (): array => [
-                    ...$this->getSendModeSchema(),
-                    DateTimePicker::make('scheduled_at')
-                        ->label(__('fin-mail::fin-mail.compose.schedule.scheduled_at'))
-                        ->seconds(false)
-                        ->native(false)
-                        // Frontend only: allow today or any future date, with any
-                        // time from the start of the day (no time is disabled).
-                        ->minDate(now()->startOfDay())
-                        ->required()
-                        // Backend: the real guard — the moment must be in the future.
-                        // Validated server-side on submit, so an out-of-range time
-                        // shows an inline error instead of resetting the field.
-                        ->rules(['after:now'])
-                        ->validationMessages([
-                            'after' => __('fin-mail::fin-mail.compose.schedule.future_error'),
-                        ])
-                        ->helperText(__('fin-mail::fin-mail.compose.schedule.timezone_hint', [
-                            'timezone' => config('app.timezone'),
-                        ])),
-                ])
+                ->schema(fn (): array => $this->getScheduleSchema())
                 ->action(function (array $data): void {
                     $this->schedule($data);
                 }),
 
-            Action::make('preview')
-                ->label(__('fin-mail::fin-mail.compose.actions.preview'))
-                ->icon(Heroicon::OutlinedEye)
-                ->modal()
-                ->modalHeading(__('fin-mail::fin-mail.template.actions.preview'))
-                ->modalContent(fn () => view('fin-mail::components.email-preview', [
-                    'subject' => $this->data['subject'] ?? '',
-                    'preheader' => $this->data['preheader'] ?? '',
-                    'html' => $this->getPreviewHtml(),
-                    'theme' => $this->record->theme?->resolvedColors(),
-                ]))
-                ->modalWidth(Width::FourExtraLarge)
-                ->modalSubmitAction(false)
-                ->color('gray'),
+            $this->getPreviewAction(),
 
             Action::make('back')
                 ->label(__('fin-mail::fin-mail.template.actions.back_to_templates'))

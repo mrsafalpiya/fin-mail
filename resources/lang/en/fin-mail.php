@@ -207,6 +207,7 @@ return [
             'field' => 'Recipient CSV',
             'helper' => 'One row per recipient. Each row is sent as its own email, using that row\'s token values.',
             'headers' => 'Required header row: :headers',
+            'replace_helper' => 'Leave this empty to keep the recipients already scheduled; uploading a file replaces all of them.',
             'ready' => ':count recipient(s) ready.',
             'mapped' => 'Mapped tokens: :tokens.',
             'no_recipients' => 'No valid recipients were found in this file.',
@@ -281,14 +282,32 @@ return [
         ],
 
         'actions' => [
+            'edit' => 'Edit',
             'cancel' => 'Cancel',
             'cancel_heading' => 'Cancel scheduled email',
             'cancel_description' => 'Are you sure you want to cancel this scheduled email? It will not be sent.',
         ],
 
+        'edit' => [
+            'title_with_name' => 'Edit Scheduled Email: :name',
+            'heading' => 'Update Schedule',
+            'description' => 'Choose when this email should be sent.',
+            'description_multiple' => 'You have multiple recipients. Choose how to send this email and when it should go out.',
+
+            'actions' => [
+                'update' => 'Update Schedule',
+                'back' => 'Back to Scheduled Emails',
+            ],
+        ],
+
         'notifications' => [
             'cancelled' => 'Scheduled email cancelled',
             'cancel_failed' => 'This email can no longer be cancelled.',
+            'updated' => 'Scheduled email updated',
+            'updated_body' => 'This email will now be sent on :time.',
+            'not_editable' => 'This email can no longer be edited.',
+            'edit_failed' => 'This email has already been sent',
+            'edit_failed_body' => 'It went out with its previous content, so your changes were not saved.',
         ],
     ],
 
